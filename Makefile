@@ -12,3 +12,6 @@ front:
 
 back:
 	docker exec -ti my-medusa-store-backend sh
+
+redis:
+	docker exec -it my-medusa-store-redis redis-cli
