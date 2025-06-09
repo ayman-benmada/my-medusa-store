@@ -56,7 +56,7 @@ services:
       image: "node:20-alpine"
       user: "node"
       working_dir: /home/node/app
-      command: "yarn dev"
+      command: "./entrypoint.sh"
       depends_on:
         - postgres
         - redis
@@ -84,7 +84,7 @@ services:
       image: "node:20-bullseye"
       user: "node"
       working_dir: /home/node/app
-      command: "yarn dev"
+      command: "./entrypoint.sh"
       depends_on:
         - postgres
         - redis
