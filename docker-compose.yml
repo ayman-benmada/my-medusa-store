@@ -1,0 +1,109 @@
+services:
+    traefik:
+        container_name: my-medusa-store-traefik
+        image: traefik:v3.4
+        command:
+            - --api.insecure=true
+            - --api.dashboard=true
+            - --providers.docker
+            - --providers.docker.exposedByDefault=false
+            - --log.level=DEBUG
+            - --entryPoints.web.address=:80
+        ports:
+            - "80:80"
+            - "8080:8080"
+        labels:
+            - traefik.enable=true
+            - traefik.http.routers.traefik.rule=Host(`traefik.$DOMAIN`)
+            - traefik.http.routers.traefik.service=traefik
+            - traefik.http.services.traefik.loadbalancer.server.port=8080
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+
+    postgres:
+      container_name: my-medusa-store-db
+      image: postgres
+      restart: unless-stopped
+      shm_size: 128mb
+      environment:
+        POSTGRES_USER: $POSTGRES_USER
+        POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+        POSTGRES_DB: $POSTGRES_DB
+      ports:
+        - "5432:5432"
+      volumes:
+        - database_volume:/var/lib/postgresql/data
+
+    adminer:
+      container_name: my-medusa-store-adminer
+      image: adminer
+      restart: unless-stopped
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.adminer.rule=Host(`adminer.$DOMAIN`)
+        - traefik.http.routers.adminer.service=adminer
+        - traefik.http.services.adminer.loadbalancer.server.port=8080
+
+    redis:
+      container_name: my-medusa-store-redis
+      image: redis:alpine
+      restart: unless-stopped
+      volumes:
+        - redis_volume:/data
+
+    backend:
+      container_name: my-medusa-store-backend
+      image: "node:20-alpine"
+      user: "node"
+      working_dir: /home/node/app
+      command: "npm run dev"
+      depends_on:
+        - postgres
+        - redis
+      environment:
+        NODE_ENV: $NODE_ENV
+        MEDUSA_ADMIN_ONBOARDING_TYPE: $MEDUSA_ADMIN_ONBOARDING_TYPE
+        STORE_CORS: $STORE_CORS
+        ADMIN_CORS: $ADMIN_CORS
+        AUTH_CORS: $AUTH_CORS
+        REDIS_URL: $REDIS_URL
+        JWT_SECRET: $JWT_SECRET
+        COOKIE_SECRET: $COOKIE_SECRET
+        DATABASE_URL: $DATABASE_URL
+        MEDUSA_ADMIN_ONBOARDING_NEXTJS_DIRECTORY: $MEDUSA_ADMIN_ONBOARDING_NEXTJS_DIRECTORY
+      volumes:
+        - ./backend:/home/node/app
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.backend.rule=Host(`backend.$DOMAIN`)
+        - traefik.http.routers.backend.service=backend
+        - traefik.http.services.backend.loadbalancer.server.port=9000
+
+    storefront:
+      container_name: my-medusa-store-storefront
+      image: "node:20-alpine"
+      user: "node"
+      working_dir: /home/node/app
+      command: "npm run dev"
+      depends_on:
+        - postgres
+        - redis
+      environment:
+        NODE_ENV: $NODE_ENV
+        MEDUSA_BACKEND_URL: $MEDUSA_BACKEND_URL
+        NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: $NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
+        NEXT_PUBLIC_BASE_URL: $NEXT_PUBLIC_BASE_URL
+        NEXT_PUBLIC_DEFAULT_REGION: $NEXT_PUBLIC_DEFAULT_REGION
+        NEXT_PUBLIC_STRIPE_KEY: $NEXT_PUBLIC_STRIPE_KEY
+        REVALIDATE_SECRET: $REVALIDATE_SECRET
+      volumes:
+        - ./backend-storefront:/home/node/app
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.storefront.rule=Host(`$DOMAIN`)
+        - traefik.http.routers.storefront.service=storefront
+        - traefik.http.services.storefront.loadbalancer.server.port=8080
+
+volumes:
+    database_volume:
+    redis_volume:
